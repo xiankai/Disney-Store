@@ -1,0 +1,7 @@
+{
+	"require": {
+		"monolog/monolog": "dev-master",
+		"predis/predis": "dev-master",
+		"chuyskywalker/rolling-curl": "*"
+	}
+}
