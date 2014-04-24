@@ -29,12 +29,19 @@ class DisneyStore {
 
 	// Entrypoint
 	public function init() {
-		$notification_curl = new RollingCurl\RollingCurl();
+		$rolling_curl = new RollingCurl\RollingCurl();
+		// Because the default of 5 makes the site choke and return more errors than usual. What.
+		// $rolling_curl->setSimultaneousLimit(2);
 
 		// Callback
-		$checkStock = function($request)  {
+		$checkStock = function($request) use ($rolling_curl) {
 			$item = $request->getExtraInfo();
 			$message = $request->getResponseText();
+
+			if (!$item) {
+				// A notification request
+				return;
+			}
 
 			if ($this->stringContains($message, '_ERR_PROD_NOT_ORDERABLE')) {
 				$stock = OUT_OF_STOCK;
@@ -60,17 +67,12 @@ class DisneyStore {
 				// Or if recovered from error
 				|| $item->stock === UNKNOWN_ERROR && $stock !== UNKNOWN_ERROR
 			) {
-				$this->notify($item, $stock);
+				$this->notify($item, $stock, $rolling_curl);
 			}
 		};
 
 		// Callback
-		$parseStoreList = function($request) use ($checkStock, $notification_curl) {
-			$rolling_curl = new RollingCurl\RollingCurl();
-			$rolling_curl->setCallback($checkStock);
-
-			// Because the default of 5 makes the site choke and return more errors than usual. What.
-			$rolling_curl->setSimultaneousLimit(2);
+		$parseStoreList = function($request) use ($rolling_curl, $checkStock) {
 
 			// Split headers and body
 			$info = $request->getResponseInfo();
@@ -111,7 +113,7 @@ class DisneyStore {
 					)
 				) {
 					$this->store->set($item->title, NO_STOCK);
-					$this->notify($item, NO_STOCK);
+					$this->notify($item, NO_STOCK, $rolling_curl);
 					continue;
 				}
 
@@ -139,6 +141,7 @@ class DisneyStore {
 				$rolling_curl->add($curl);
 			}
 
+			$rolling_curl->setCallback($checkStock);
 			$rolling_curl->execute();
 		};
 
@@ -160,7 +163,7 @@ class DisneyStore {
 			->execute();
 	}
 
-	private function notify($item, $stock) {
+	private function notify($item, $stock, $rolling_curl) {
 		$message = $item->title . ': ' . $this->base_url . $item->link . PHP_EOL;
 		$message .= 'Image: ' . $item->imageUrl . PHP_EOL;
 
@@ -202,13 +205,11 @@ class DisneyStore {
 
 		$item->new_stock = $stock;
 
-		$rolling_curl = new RollingCurl\RollingCurl();
 		$rolling_curl->post('https://api.pushover.net/1/messages.json', array(
 			'token' => 'aSruoKSByoBRHJfdx5ZTDZZEindFiE',
 			'user' => 'u4en9LeaFguiSD4gAewuRXkydRaKGw',
 			'message' => $message,
-		))
-		->execute();
+		));
 	}
 }
 
