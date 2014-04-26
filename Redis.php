@@ -13,7 +13,7 @@ class Redis implements StoreInterface {
 	}
 
 	function get($key) {
-		return !is_null($this->store->get($key));
+		return $this->store->get($key);
 	}
 
 	function set($key, $value) {
