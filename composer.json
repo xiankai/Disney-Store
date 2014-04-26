@@ -1,4 +1,10 @@
 {
+	"repositories": [
+		{
+			"type": "vcs",
+			"url": "https://github.com/xiankai/rolling-curl"
+		}
+	],
 	"require": {
 		"monolog/monolog": "dev-master",
 		"mandrill/mandrill": "*",
