@@ -55,7 +55,7 @@ class DisneyStore {
 
 			if ($item->status === OLD_ENTRY && $stock === UNKNOWN_ERROR) {
 				// Don't update old entries with "error" - refresh expiry in the meantime
-				$this->store->set($item->title, $item->status);
+				$this->store->set($item->title, $item->stock);
 			} else {
 				$this->store->set($item->title, $stock);
 			}
