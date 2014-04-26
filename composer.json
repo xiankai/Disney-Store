@@ -4,5 +4,12 @@
 		"mandrill/mandrill": "*",
 		"predis/predis": "dev-master",
 		"chuyskywalker/rolling-curl": "*"
+	},
+	"autoload": {
+		"psr-4": { 
+			"Mock\\": "mock/",
+			"Store\\": "store/",
+			"Disney\\": "disney/"
+		}
 	}
 }

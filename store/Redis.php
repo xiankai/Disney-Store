@@ -1,6 +1,6 @@
 <?
 
-require 'StoreInterface.php';
+namespace Store;
 
 class Redis implements StoreInterface {
 
@@ -8,7 +8,7 @@ class Redis implements StoreInterface {
 	private $interval;
 
 	function __construct($interval) {
-		$this->store = new Predis\Client();
+		$this->store = new \Predis\Client();
 		$this->interval = $interval;
 	}
 

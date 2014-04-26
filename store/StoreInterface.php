@@ -1,5 +1,7 @@
 <?
 
+namespace Store;
+
 interface StoreInterface {
 	public function __construct($interval);
 

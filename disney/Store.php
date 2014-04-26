@@ -1,5 +1,7 @@
 <?
 
+namespace Disney;
+
 define('IN_STOCK', "1");
 define('OUT_OF_STOCK', "2");
 define('NO_STOCK', "3");
@@ -11,7 +13,7 @@ define('OLD_ENTRY', "7");
 // Disney-specifc
 define('FROZEN', 1021701);
 
-class DisneyStore {
+class Store {
 	private $base_url;
 	private $logger;
 	private $store;
@@ -28,10 +30,8 @@ class DisneyStore {
 	}
 
 	// Entrypoint
-	public function init() {
-		$rolling_curl = new RollingCurl\RollingCurl();
-		// Because the default of 5 makes the site choke and return more errors than usual. What.
-		// $rolling_curl->setSimultaneousLimit(2);
+	public function init($curl_factory, $request_factory, $parser) {
+		$rolling_curl = $curl_factory->instantiate();
 
 		// Callback
 		$checkStock = function($request) use ($rolling_curl) {
@@ -73,33 +73,10 @@ class DisneyStore {
 		};
 
 		// Callback
-		$parseStoreList = function($request) use ($rolling_curl, $checkStock) {
+		$parseStoreList = function($request) use ($rolling_curl, $request_factory, $parser, $checkStock) {
+			$response = $parser->validateListing($request);
 
-			// Split headers and body
-			$info = $request->getResponseInfo();
-			$header = substr($request->getResponseText(), 0, $info['header_size']);
-			$body = substr($request->getResponseText(), $info['header_size']);
-
-			// Get required cookies from header
-			$cookies = array();
-			$results = preg_match_all('/Set-Cookie: (.*?);/', $header, $cookies);
-			if (is_int($results) && $results > 0) {
-				$cookies = implode('; ', $cookies[1]) . ';';
-			} else {
-				echo $request->getResponseText();
-				throw new DisneyException('Unable to get required cookie');
-			}
-
-			$items = json_decode($body);
-
-			if (is_null($items)) {
-				// This is as 'items'  key is not present, so there is a trailing comma in the JSON string which renders it invalid.
-				// Great job, Disney.
-				echo $request->getResponseText();
-				throw new DisneyException('No items found.'); 
-			}
-
-			foreach ($items->items as $item) {
+			foreach ($response['items']->items as $item) {
 				// Some store items have same exact names. Use product ID to distinguish.
 				$item->title .= " ({$item->productId})";
 				$item->status = $this->store->keyExists($item->title) ? OLD_ENTRY : NEW_ENTRY;
@@ -125,12 +102,12 @@ class DisneyStore {
 				}
 
 				// Check for stock
-				$curl = new RollingCurl\Request($this->base_url . '/disney/store/DSIAjaxOrderItemAdd', 'POST');
+				$curl = $request_factory->instantiate($this->base_url . '/disney/store/DSIAjaxOrderItemAdd', 'POST');
 
 				// Set required cookies
 				$curl->addOptions(array(
 					CURLOPT_COOKIESESSION => true,
-					CURLOPT_COOKIE => $cookies,
+					CURLOPT_COOKIE => $response['cookies'],
 				))
 				->setExtraInfo($item)
 				->setPostData(array(
@@ -153,7 +130,7 @@ class DisneyStore {
 			'navNum' => 96,
 		));
 
-		$curl = new RollingCurl\RollingCurl();
+		$curl = $curl_factory->instantiate();
 		$response = $curl
 			->get($this->base_url . '/disney/store/DSIProcessWidget?' . $params)
 			->addOptions(array(
@@ -206,6 +183,9 @@ class DisneyStore {
 
 		$item->new_stock = $stock;
 
+		echo $message . PHP_EOL;
+		return;
+
 		$rolling_curl->post('https://api.pushover.net/1/messages.json', array(
 			'token' => 'aSruoKSByoBRHJfdx5ZTDZZEindFiE',
 			'user' => 'u4en9LeaFguiSD4gAewuRXkydRaKGw',
@@ -213,5 +193,3 @@ class DisneyStore {
 		));
 	}
 }
-
-class DisneyException extends Exception {}
