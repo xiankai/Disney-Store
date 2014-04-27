@@ -37,14 +37,14 @@ $configs = array(
 	),
 	array(
 		'db' => 2,
-		'url' => 'http://www.disneystore.co.de',
+		'url' => 'http://www.disneystore.de',
 		'store_id' => 70051,
 		'frozen_id' => 1431501,
 		'locale' => 'de',
 	),
 	array(
 		'db' => 3,
-		'url' => 'http://www.disneystore.co.fr',
+		'url' => 'http://www.disneystore.fr',
 		'store_id' => 60051,
 		'frozen_id' => 1435501,
 		'locale' => 'fr',
