@@ -7,8 +7,9 @@ class Redis implements StoreInterface {
 	private $store;
 	private $interval;
 
-	function __construct($interval) {
+	function __construct($db, $interval) {
 		$this->store = new \Predis\Client();
+		$this->store->select($db);
 		$this->interval = $interval;
 	}
 

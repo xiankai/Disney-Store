@@ -9,7 +9,7 @@
 		"monolog/monolog": "dev-master",
 		"mandrill/mandrill": "*",
 		"predis/predis": "dev-master",
-		"chuyskywalker/rolling-curl": "*"
+		"chuyskywalker/rolling-curl": "dev-master"
 	},
 	"autoload": {
 		"psr-4": { 

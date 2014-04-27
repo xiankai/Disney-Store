@@ -10,20 +10,24 @@ define('UNKNOWN_ERROR', "4");
 define('NEW_ENTRY', "5");
 define('OLD_ENTRY', "7");
 
-// Disney-specifc
-define('FROZEN', 1021701);
-
 class Store {
 	private $base_url;
 	private $logger;
 	private $store;
-
 	private $rolling_curl;
 
-	public function __construct($base_url, $store, $logger="") {
-		$this->base_url = $base_url;
-		$this->logger = $logger;
+	private $store_id;
+	private $frozen_id;
+
+	private $notify = true;
+
+	public function __construct($store, $config) {
 		$this->store = $store;
+
+		$this->base_url = $config['url'];
+		$this->store_id = $config['store_id'];
+		$this->frozen_id = $config['frozen_id'];
+		$this->locale = $config['locale'];
 	}
 
 	// Helper
@@ -38,8 +42,8 @@ class Store {
 		$this->parser = $parser;
 
 		$params = http_build_query(array(
-			'storeId' => 10051,
-			'N' => FROZEN,
+			'storeId' => $this->store_id,
+			'N' => $this->frozen_id,
 			'templateId' => 'Width-3_4-ProductList',
 			'navNum' => 96,
 		));
@@ -94,7 +98,7 @@ class Store {
 			->setExtraInfo($item)
 			->setPostData(array(
 				'quantity' => 1,
-				'originalStoreId' => 10051,
+				'originalStoreId' => $this->store_id,
 				'catEntryId' => $item->productId,
 			));
 
@@ -144,7 +148,7 @@ class Store {
 	}
 
 	private function notify($item, $stock) {
-		$message = $item->title . ': ' . $this->base_url . $item->link . PHP_EOL;
+		$message = strtoupper($this->locale) . ' ' . $item->title . ': ' . $this->base_url . $item->link . PHP_EOL;
 		$message .= 'Image: ' . $item->imageUrl . PHP_EOL;
 
 		switch ($item->status) {
