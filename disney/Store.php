@@ -62,6 +62,11 @@ class Store {
 	public function parseStoreList($request) {
 		$response = $this->parser->validateListing($request);
 
+		// No existing items. Let's not notify or a flood will be caused.
+		if ($this->store->count() < 1) {
+			$this->notify = false;
+		}
+
 		foreach ($response['items']->items as $item) {
 			// Some store items have same exact names. Use product ID to distinguish.
 			$item->title .= " ({$item->productId})";
@@ -148,6 +153,10 @@ class Store {
 	}
 
 	private function notify($item, $stock) {
+		if (!$this->notify) {
+			return;
+		}
+
 		$message = strtoupper($this->locale) . ' ' . $item->title . ': ' . $this->base_url . $item->link . PHP_EOL;
 		$message .= 'Image: ' . $item->imageUrl . PHP_EOL;
 
@@ -188,9 +197,6 @@ class Store {
 		}
 
 		$item->new_stock = $stock;
-
-		echo $message . PHP_EOL;
-		return;
 
 		$this->rolling_curl->post('https://api.pushover.net/1/messages.json', array(
 			'token' => 'aSruoKSByoBRHJfdx5ZTDZZEindFiE',

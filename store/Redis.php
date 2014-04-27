@@ -26,4 +26,8 @@ class Redis implements StoreInterface {
 	function keyExists($key) {
 		return !is_null($this->store->get($key));
 	}
+
+	function count() {
+		return $this->store->dbsize();
+	}
 }
