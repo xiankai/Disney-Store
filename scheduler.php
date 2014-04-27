@@ -59,6 +59,6 @@ $parser = new Disney\Parser();
 
 foreach ($configs as $config) {
 	$redis = new Store\Redis($config['db'], 300);
-	$store = new Disney\Store($config['url'], $redis, $config['store_id'], $config['frozen_id']);
+	$store = new Disney\Store($redis, $config);
 	$store->init($curl_factory, $request_factory, $parser);
 }
