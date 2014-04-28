@@ -19,20 +19,14 @@ class Store {
 	private $store_id;
 	private $frozen_id;
 
-	private $notify = true;
-
-	public function __construct($store, $config) {
+	public function __construct($store, $config, $notifier) {
 		$this->store = $store;
+		$this->notifier = $notifier;
 
 		$this->base_url = $config['url'];
 		$this->store_id = $config['store_id'];
 		$this->frozen_id = $config['frozen_id'];
 		$this->locale = $config['locale'];
-	}
-
-	// Helper
-	public function stringContains($haystack, $needle) {
-		return stripos($haystack, $needle) !== false;
 	}
 
 	// Entrypoint
@@ -63,9 +57,9 @@ class Store {
 		$response = $this->parser->validateListing($request);
 
 		// No existing items. Let's not notify or a flood will be caused.
-		if ($this->store->count() < 1) {
-			$this->notify = false;
-		}
+		$notify = $this->store->count() < 1;
+
+		$messages = array();
 
 		foreach ($response['items']->items as $item) {
 			// Some store items have same exact names. Use product ID to distinguish.
@@ -78,11 +72,11 @@ class Store {
 					// Collections are basically groups of items that may or may not be elsewhere in the listings.
 					$item->isCollection === "true" ||
 					// Customizable items cannot have stock tracked	
-					$this->stringContains($item->title, 'Create Your Own')
+					\stringContains($item->title, 'Create Your Own')
 				)
 			) {
 				$this->store->set($item->title, NO_STOCK);
-				$this->notify($item, NO_STOCK);
+				$messages[] = $this->parser->generateMessage($item, $this->base_url, $this->locale, NO_STOCK);
 				continue;
 			}
 
@@ -112,92 +106,53 @@ class Store {
 
 		$this->rolling_curl->execute();
 
-		$this->checkStock($this->rolling_curl->getCompletedRequests(), true);
+		$messages = array_merge($messages, $this->checkStock($this->rolling_curl->getCompletedRequests()));
+
+		if ($notify) {
+			$this->notify($messages);
+		}
 	}
 
 	private function checkStock($requests) {
-		$new = $old = $restock = 0;
-		$plaintext = $html = "";
+		$messages = array();
 
 		foreach ($requests as $request) {
 			$item = $request->getExtraInfo();
-			$response = $request->getResponseText();
+			$stock = $this->parser->validateStock($request->getResponseText(), $item->productId);
 
-			if ($this->stringContains($response, '_ERR_PROD_NOT_ORDERABLE')) {
-			$stock = OUT_OF_STOCK;
-			} elseif ($this->stringContains($response, '_ERR_GETTING_SKU')) {
-			$stock = NO_STOCK;
-			} elseif ($this->stringContains($response, '"catEntryId": "' . $item->productId . '"')) {
-			$stock = IN_STOCK;
-		} else {
-			$stock = UNKNOWN_ERROR;
-		}
-
-		if ($item->status === OLD_ENTRY && $stock === UNKNOWN_ERROR) {
-			// Don't update old entries with "error" - refresh expiry in the meantime
-			$this->store->set($item->title, $item->stock);
-		} else {
-			$this->store->set($item->title, $stock);
-		}
-
-		if (
-			// Notify if new entry
-			$item->status === NEW_ENTRY 
-			// Or if restocked
-				|| $item->stock !== IN_STOCK && $item->new_stock === IN_STOCK
-			// Or if recovered from error
-				|| $item->stock === UNKNOWN_ERROR && $item->new_stock !== UNKNOWN_ERROR
-		) {
-
+			if ($item->status === OLD_ENTRY && $stock === UNKNOWN_ERROR) {
+				// Don't update old entries with "error" - refresh expiry in the meantime
+				$this->store->set($item->title, $item->stock);
 			} else {
-				continue;
+				$this->store->set($item->title, $stock);
+			}
+
+			if (
+				// Notify if new entry
+				$item->status === NEW_ENTRY 
+				// Or if restocked
+				|| $item->stock !== IN_STOCK && $stock === IN_STOCK
+				// Or if recovered from error
+				|| $item->stock === UNKNOWN_ERROR && $stock !== UNKNOWN_ERROR
+			) {
+				$messages[] = $this->parser->generateMessage($item, $this->base_url, $this->locale, $stock);
+			}
 		}
 
-		$message = strtoupper($this->locale) . ' ' . $item->title . ': ' . $this->base_url . $item->link . PHP_EOL;
-		$message .= 'Image: ' . $item->imageUrl . PHP_EOL;
+		return $messages;
+	}
 
-		switch ($item->status) {
-			case NEW_ENTRY: 
-				$message .= 'Status: ' . 'New';
-				$snippet = 'A new item ';
-				break;
-			case OLD_ENTRY: 
-				$message .= 'Status: ' . 'Old';
-				$snippet = 'An existing item ';
-				break;
+	private function notify($messages) {
+		$new = $old = $restock = 0;
+		$html = "";
+
+		foreach ($messages as $message) {
+			$new += $message['new'];
+			$old += $message['old'];
+			$restock += $message['restock'];
+			$html .= $message['html'];
 		}
 
-		$message .= PHP_EOL . 'Stock: ';
-		
-		switch ($stock) {
-			case IN_STOCK: 
-				$message .= 'Yes';
-				$snippet .= ' has been restocked!';
-				$level = 'notice';
-				break;
-			case OUT_OF_STOCK: 
-				$message .= 'No';
-				$snippet .= ' has been listed but is out of stock.';
-				$level = 'info';
-				break;
-			case NO_STOCK: 
-				$message .= 'N/A';
-				$snippet .= ' has been listed!';
-				$level = 'notice';
-				break;
-			case UNKNOWN_ERROR: 
-				$message .= 'Could not check';
-				$snippet .= ' has been listed but we could not check its stock.';
-				$level = 'info';
-				break;
-		}
-
-		$item->new_stock = $stock;
-
-		$this->rolling_curl->post('https://api.pushover.net/1/messages.json', array(
-			'token' => 'aSruoKSByoBRHJfdx5ZTDZZEindFiE',
-			'user' => 'u4en9LeaFguiSD4gAewuRXkydRaKGw',
-			'message' => $message,
-		));
+		$this->notifier->add($this->locale, $html, $new, $old, $restock);
 	}
 }

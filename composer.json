@@ -6,8 +6,7 @@
 		}
 	],
 	"require": {
-		"monolog/monolog": "dev-master",
-		"mandrill/mandrill": "*",
+		"mailchimp/mailchimp": "dev-master",
 		"predis/predis": "dev-master",
 		"chuyskywalker/rolling-curl": "dev-master"
 	},

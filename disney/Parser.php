@@ -35,6 +35,72 @@ class Parser {
 		);
 	}
 
+	public function validateStock($response, $product_id) {
+		if (\stringContains($response, '_ERR_PROD_NOT_ORDERABLE')) {
+			$stock = OUT_OF_STOCK;
+		} elseif (\stringContains($response, '_ERR_GETTING_SKU')) {
+			$stock = NO_STOCK;
+		} elseif (\stringContains($response, '"catEntryId": "' . $product_id . '"')) {
+			$stock = IN_STOCK;
+		} else {
+			$stock = UNKNOWN_ERROR;
+		}
+
+		return $stock;
+	}
+
+	public function generateMessage($item, $base_url, $locale, $stock) {
+		$new = $old = $restock = 0;
+
+		$html = "<a href='" . $base_url . "'>" . $item->title . "</a><br/>";
+		$html .= "<img src='" . $item->imageUrl . "'/><br/>";
+		$html .= "Price: " . $item->price . "<br/>";
+
+		if ($item->discount) {
+			$html .= "Discount: " . $item->discount . "<br/>";
+		}
+
+		$html .= "Status: ";
+		
+		switch ($item->status) {
+			case NEW_ENTRY: 
+				$html .= 'New';
+				$new++;
+				break;
+			case OLD_ENTRY: 
+				$html .= 'Existing';
+				$old++;
+				break;
+		}
+
+		$html .= "<br/>Stock: ";
+		
+		switch ($stock) {
+			case IN_STOCK: 
+				$html .= 'Yes';
+				$restock++;
+				break;
+			case OUT_OF_STOCK: 
+				$html .= 'No';
+				break;
+			case NO_STOCK: 
+				$html .= 'N/A';
+				break;
+			case UNKNOWN_ERROR: 
+				$html .= 'Could not check';
+				break;
+		}
+
+		$html .= '<br/>';
+
+		return array(
+			'new' => $new,
+			'old' => $old,
+			'restock' => $restock,
+			'html' => $html,
+		);
+	}
+
 }
 
 class DisneyException extends \Exception {}

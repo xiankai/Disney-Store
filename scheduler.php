@@ -1,6 +1,12 @@
 <?
 
+$then = microtime(true);
+
 require 'vendor/autoload.php';
+
+$external_config = parse_ini_file('config.ini', true);
+
+date_default_timezone_set($external_config['timezone']);
 
 class CurlFactory {
 
@@ -20,36 +26,12 @@ class RequestFactory {
 
 }
 
-$configs = array(
-	array(
-		'db' => 0,
-		'url' => 'http://www.disneystore.com',
-		'store_id' => 10051,
-		'frozen_id' => 1021701,
-		'locale' => 'us',
-	),
-	array(
-		'db' => 1,
-		'url' => 'http://www.disneystore.co.uk',
-		'store_id' => 30053,
-		'frozen_id' => 1340001,
-		'locale' => 'uk'
-	),
-	array(
-		'db' => 2,
-		'url' => 'http://www.disneystore.de',
-		'store_id' => 70051,
-		'frozen_id' => 1431501,
-		'locale' => 'de',
-	),
-	array(
-		'db' => 3,
-		'url' => 'http://www.disneystore.fr',
-		'store_id' => 60051,
-		'frozen_id' => 1435501,
-		'locale' => 'fr',
-	),
-);
+// Helper
+function stringContains($haystack, $needle) {
+	return stripos($haystack, $needle) !== false;
+}
+
+$mailchimp = new Disney\MailChimp($external_config['mailchimp']);
 
 $curl_factory = new CurlFactory();
 $request_factory = new RequestFactory();
@@ -57,8 +39,18 @@ $parser = new Disney\Parser();
 // Because the default of 5 makes the site choke and return more errors than usual. What.
 // $rolling_curl->setSimultaneousLimit(2);
 
-foreach ($configs as $config) {
-	$redis = new Store\Redis($config['db'], 300);
-	$store = new Disney\Store($redis, $config);
-	$store->init($curl_factory, $request_factory, $parser);
+try {
+	foreach ($external_config['disney'] as $config) {
+		$redis = new Store\Redis($config['db'], 300);
+		$store = new Disney\Store($redis, $config, $mailchimp);
+		$store->init($curl_factory, $request_factory, $parser);
+	}	
+} catch (Disney\DisneyException $e) {
+	echo $e->getMessage();
 }
+
+$mailchimp->send();
+
+$now = microtime(true);
+
+echo sprintf("Elapsed:  %f", $now - $then);
