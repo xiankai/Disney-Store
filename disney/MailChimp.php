@@ -35,17 +35,25 @@ class MailChimp {
 
 	public function send() {
 		$subject = array();
+		$send = false;
 
 		if ($this->new > 0) {
 			array_push($subject, $this->new . " new items");
+			$send = true;
 		}
 
 		if ($this->old > 0) {
 			array_push($subject, $this->old . " existing items");
+			$send = true;
 		}
 
 		if ($this->stock > 0) {
 			array_push($subject, $this->stock . " in stock");
+			$send = true;
+		}
+
+		if (!$send) {
+			return;
 		}
 
 		$subject = implode(", ", $subject);

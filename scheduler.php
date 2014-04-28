@@ -46,7 +46,7 @@ try {
 		$store->init($curl_factory, $request_factory, $parser);
 	}	
 } catch (Disney\DisneyException $e) {
-	echo $e->getMessage();
+	echo PHP_EOL . $config['locale'] . ': ' . $e->getMessage();
 }
 
 $mailchimp->send();
