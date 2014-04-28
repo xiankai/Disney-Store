@@ -110,24 +110,24 @@ class Store {
 			$this->rolling_curl->add($curl);
 		}
 
-		$this->rolling_curl->setCallback(array($this, 'checkStock'));
 		$this->rolling_curl->execute();
+
+		$this->checkStock($this->rolling_curl->getCompletedRequests(), true);
 	}
 
-	public function checkStock($request) {
-		$item = $request->getExtraInfo();
-		$message = $request->getResponseText();
+	private function checkStock($requests) {
+		$new = $old = $restock = 0;
+		$plaintext = $html = "";
 
-		if (!$item) {
-			// A notification request
-			return;
-		}
+		foreach ($requests as $request) {
+			$item = $request->getExtraInfo();
+			$response = $request->getResponseText();
 
-		if ($this->stringContains($message, '_ERR_PROD_NOT_ORDERABLE')) {
+			if ($this->stringContains($response, '_ERR_PROD_NOT_ORDERABLE')) {
 			$stock = OUT_OF_STOCK;
-		} elseif ($this->stringContains($message, '_ERR_GETTING_SKU')) {
+			} elseif ($this->stringContains($response, '_ERR_GETTING_SKU')) {
 			$stock = NO_STOCK;
-		} elseif ($this->stringContains($message, '"catEntryId": "' . $item->productId . '"')) {
+			} elseif ($this->stringContains($response, '"catEntryId": "' . $item->productId . '"')) {
 			$stock = IN_STOCK;
 		} else {
 			$stock = UNKNOWN_ERROR;
@@ -144,17 +144,13 @@ class Store {
 			// Notify if new entry
 			$item->status === NEW_ENTRY 
 			// Or if restocked
-			|| $item->stock !== IN_STOCK && $stock === IN_STOCK
+				|| $item->stock !== IN_STOCK && $item->new_stock === IN_STOCK
 			// Or if recovered from error
-			|| $item->stock === UNKNOWN_ERROR && $stock !== UNKNOWN_ERROR
+				|| $item->stock === UNKNOWN_ERROR && $item->new_stock !== UNKNOWN_ERROR
 		) {
-			$this->notify($item, $stock);
-		}
-	}
 
-	private function notify($item, $stock) {
-		if (!$this->notify) {
-			return;
+			} else {
+				continue;
 		}
 
 		$message = strtoupper($this->locale) . ' ' . $item->title . ': ' . $this->base_url . $item->link . PHP_EOL;
