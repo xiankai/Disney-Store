@@ -35,26 +35,6 @@ class Parser {
 		);
 	}
 
-	public function validateItem($item) {
-		if (
-			$item->status === NEW_ENTRY && (
-				// Collections are basically groups of items that may or may not be elsewhere in the listings.
-				$item->isCollection === "true" ||
-				// Customizable items cannot have stock tracked	
-				\stringContains($item->title, 'Create Your Own')
-			)
-		) {
-			return ADD_NEW_ENTRY;
-		}
-
-		// Refresh timer
-		if ($item->stock === NO_STOCK) {
-			return UPDATE_OLD_ENTRY;
-		}
-
-		return CHECK_ON_STOCK;
-	}
-
 	public function validateStock($response, $product_id) {
 		if (\stringContains($response, '_ERR_PROD_NOT_ORDERABLE')) {
 			return OUT_OF_STOCK;

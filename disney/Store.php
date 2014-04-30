@@ -43,8 +43,7 @@ class Store {
 		));
 
 		$curl = $this->curl_factory->instantiate();
-		$response = $curl
-			->get($this->base_url . '/disney/store/DSIProcessWidget?' . $params)
+		$curl->get($this->base_url . '/disney/store/DSIProcessWidget?' . $params)
 			->addOptions(array(
 				CURLOPT_HEADER => true,
 				CURLOPT_COOKIESESSION => true,
@@ -59,27 +58,7 @@ class Store {
 
 		$items = $this->updateStock($response['items'], $response['cookies']);
 
-		$notify_items = array();
-
-		foreach ($items as $item) {
-			if ($item->status === OLD_ENTRY && $item->new_stock === UNKNOWN_ERROR) {
-				// Don't update old entries with the "new error" - refresh the existing stock status
-				$this->store->set($item->title, $item->stock);
-			} else {
-				$this->store->set($item->title, $item->new_stock);
-			}
-
-			if (
-				// Notify if new entry
-				$item->status === NEW_ENTRY 
-				// Or if restocked
-				|| $item->stock !== IN_STOCK && $item->new_stock === IN_STOCK
-				// Or if recovered from error
-				|| $item->stock === UNKNOWN_ERROR && $item->new_stock !== UNKNOWN_ERROR
-			) {
-				$notify_items[] = $item;
-			}
-		}
+		$notify_items = $this->processStock($items);
 		
 		if ($notify) {
 			$this->notify($notify_items);
@@ -127,7 +106,7 @@ class Store {
 		return $items;
 	}
 
-	private function checkStock($curl, $item, $cookies) {
+	public function checkStock($curl, $item, $cookies) {
 		// Check for stock
 		$request = $this->request_factory->instantiate($this->base_url . '/disney/store/DSIAjaxOrderItemAdd', 'POST');
 
@@ -146,8 +125,33 @@ class Store {
 		$curl->add($request);
 	}
 
-	private function notify($items) {
+	public function processStock($items) {
+		$notify_items = array();
 
+		foreach ($items as $item) {
+			if ($item->status === OLD_ENTRY && $item->new_stock === UNKNOWN_ERROR) {
+				// Don't update old entries with the "new error" - refresh the existing stock status
+				$this->store->set($item->title, $item->stock);
+			} else {
+				$this->store->set($item->title, $item->new_stock);
+			}
+
+			if (
+				// Notify if new entry
+				$item->status === NEW_ENTRY 
+				// Or if restocked
+				|| $item->stock !== IN_STOCK && $item->new_stock === IN_STOCK
+				// Or if recovered from error
+				|| $item->stock === UNKNOWN_ERROR && $item->new_stock !== UNKNOWN_ERROR
+			) {
+				$notify_items[] = $item;
+			}
+		}
+
+		return $notify_items;
+	}
+
+	public function notify($items) {
 		$new = $old = $restock = 0;
 		$html = "";
 

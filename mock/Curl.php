@@ -12,7 +12,7 @@ class Curl {
 		return $this;
 	}
 
-	function setCallback(\Closure $closure) {
+	function setCallback($closure) {
 		$this->callback = $closure;
 		return $this;
 	}
