@@ -89,7 +89,7 @@ class Parser {
 				break;
 		}
 
-		$html .= '<br/>';
+		$html .= '<br/><br/>';
 
 		return array(
 			'new' => $new,

@@ -82,7 +82,7 @@ class MailChimp {
 					'field' => 'DISNEY_' . strtoupper($locale),
 					'op' => 'eq',
 					'value' => 'Yes',
-				)
+				);
 			}, array_keys($this->html)),
 		);
 
