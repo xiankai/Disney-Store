@@ -54,8 +54,8 @@ class Store {
 		$requests = $curl->getCompletedRequests();
 		$response = $this->parser->validateListing($requests[0]);
 
-		// No existing items. Let's not notify or a flood will be caused.
-		$notify = $this->store->count() < 1;
+		// Notify only if there are existing items. If 0, a flood will be caused.
+		$notify = $this->store->count() > 0;
 
 		$items = $this->updateStock($response['items'], $response['cookies']);
 
