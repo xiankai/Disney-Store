@@ -73,9 +73,9 @@ class Store {
 				// Notify if new entry
 				$item->status === NEW_ENTRY 
 				// Or if restocked
-				|| $item->stock !== IN_STOCK && $stock === IN_STOCK
+				|| $item->stock !== IN_STOCK && $item->new_stock === IN_STOCK
 				// Or if recovered from error
-				|| $item->stock === UNKNOWN_ERROR && $stock !== UNKNOWN_ERROR
+				|| $item->stock === UNKNOWN_ERROR && $item->new_stock !== UNKNOWN_ERROR
 			) {
 				$notify_items[] = $item;
 			}
@@ -88,8 +88,6 @@ class Store {
 
 	public function updateStock($items, $cookies) {
 		$curl = $this->curl_factory->instantiate();
-
-		$notify_items = $stock_items = array();
 
 		foreach ($items as $key => $item) {
 			// Some store items have same exact names. Use product ID to distinguish.
