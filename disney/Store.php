@@ -60,7 +60,7 @@ class Store {
 
 		$notify_items = $this->processStock($items);
 		
-		if ($notify) {
+		if ($notify && count($notify_items) > 0) {
 			$this->notify($notify_items);
 		}
 	}
