@@ -50,8 +50,8 @@ class Parser {
 	public function generateMessage($item, $base_url, $locale) {
 		$new = $old = $restock = 0;
 
-		$html .= "<img src='" . $item->imageUrl . "'/><br/>";
-		$html = "<a href='" . $base_url . $item->link . "'>" . $item->title . "</a><br/>";
+		$html = "<img src='" . $item->imageUrl . "'/><br/>";
+		$html .= "<a href='" . $base_url . $item->link . "'>" . $item->title . "</a><br/>";
 		$html .= "Price: " . $item->price . "<br/>";
 
 		if ($item->discount) {
