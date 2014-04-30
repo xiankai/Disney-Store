@@ -31,7 +31,7 @@ class Store {
 
 	// Entrypoint
 	public function init($curl_factory, $request_factory, $parser) {
-		$this->rolling_curl = $curl_factory->instantiate();
+		$this->curl_factory = $curl_factory;
 		$this->request_factory = $request_factory;
 		$this->parser = $parser;
 
@@ -42,89 +42,31 @@ class Store {
 			'navNum' => 96,
 		));
 
-		$curl = $curl_factory->instantiate();
+		$curl = $this->curl_factory->instantiate();
 		$response = $curl
 			->get($this->base_url . '/disney/store/DSIProcessWidget?' . $params)
 			->addOptions(array(
 				CURLOPT_HEADER => true,
 				CURLOPT_COOKIESESSION => true,
 			))
-			->setCallback(array($this, 'parseStoreList'))
 			->execute();
-	}
 
-	public function parseStoreList($request) {
-		$response = $this->parser->validateListing($request);
+		$requests = $curl->getCompletedRequests();
+		$response = $this->parser->validateListing($requests[0]);
 
 		// No existing items. Let's not notify or a flood will be caused.
 		$notify = $this->store->count() < 1;
 
-		$messages = array();
+		$items = $this->updateStock($response['items'], $response['cookies']);
 
-		foreach ($response['items']->items as $item) {
-			// Some store items have same exact names. Use product ID to distinguish.
-			$item->title .= " ({$item->productId})";
-			$item->status = $this->store->keyExists($item->title) ? OLD_ENTRY : NEW_ENTRY;
-			$item->stock = $this->store->get($item->title);
+		$notify_items = array();
 
-			if (
-				$item->status === NEW_ENTRY && (
-					// Collections are basically groups of items that may or may not be elsewhere in the listings.
-					$item->isCollection === "true" ||
-					// Customizable items cannot have stock tracked	
-					\stringContains($item->title, 'Create Your Own')
-				)
-			) {
-				$this->store->set($item->title, NO_STOCK);
-				$messages[] = $this->parser->generateMessage($item, $this->base_url, $this->locale, NO_STOCK);
-				continue;
-			}
-
-			// Refresh timer
-			if ($item->stock === NO_STOCK) {
-				$this->store->set($item->title, NO_STOCK);
-				continue;
-			}
-
-			// Check for stock
-			$curl = $this->request_factory->instantiate($this->base_url . '/disney/store/DSIAjaxOrderItemAdd', 'POST');
-
-			// Set required cookies
-			$curl->addOptions(array(
-				CURLOPT_COOKIESESSION => true,
-				CURLOPT_COOKIE => $response['cookies'],
-			))
-			->setExtraInfo($item)
-			->setPostData(array(
-				'quantity' => 1,
-				'originalStoreId' => $this->store_id,
-				'catEntryId' => $item->productId,
-			));
-
-			$this->rolling_curl->add($curl);
-		}
-
-		$this->rolling_curl->execute();
-
-		$messages = array_merge($messages, $this->checkStock($this->rolling_curl->getCompletedRequests()));
-
-		if ($notify) {
-			$this->notify($messages);
-		}
-	}
-
-	private function checkStock($requests) {
-		$messages = array();
-
-		foreach ($requests as $request) {
-			$item = $request->getExtraInfo();
-			$stock = $this->parser->validateStock($request->getResponseText(), $item->productId);
-
-			if ($item->status === OLD_ENTRY && $stock === UNKNOWN_ERROR) {
-				// Don't update old entries with "error" - refresh expiry in the meantime
+		foreach ($items as $item) {
+			if ($item->status === OLD_ENTRY && $item->new_stock === UNKNOWN_ERROR) {
+				// Don't update old entries with the "new error" - refresh the existing stock status
 				$this->store->set($item->title, $item->stock);
 			} else {
-				$this->store->set($item->title, $stock);
+				$this->store->set($item->title, $item->new_stock);
 			}
 
 			if (
@@ -135,18 +77,84 @@ class Store {
 				// Or if recovered from error
 				|| $item->stock === UNKNOWN_ERROR && $stock !== UNKNOWN_ERROR
 			) {
-				$messages[] = $this->parser->generateMessage($item, $this->base_url, $this->locale, $stock);
+				$notify_items[] = $item;
+			}
+		}
+		
+		if ($notify) {
+			$this->notify($notify_items);
+		}
+	}
+
+	public function updateStock($items, $cookies) {
+		$curl = $this->curl_factory->instantiate();
+
+		$notify_items = $stock_items = array();
+
+		foreach ($items as $key => $item) {
+			// Some store items have same exact names. Use product ID to distinguish.
+			$item->title .= " ({$item->productId})";
+			$item->status = $this->store->keyExists($item->title) ? OLD_ENTRY : NEW_ENTRY;
+			$item->stock = $this->store->get($item->title);
+
+			if (
+				// Collections are basically groups of items that may or may not be elsewhere in the listings.
+				$item->isCollection === "true" ||
+				// Customizable items cannot have stock tracked	
+				\stringContains($item->title, 'Create Your Own') || 
+				// Already confirmed to be not stocked
+				$item->stock === NO_STOCK
+			) {
+				$item->new_stock = NO_STOCK;
+			} else{
+				// Do stock-checking
+				$this->checkStock($curl, $item, $cookies);
+
+				// Will get the updated item later
+				unset($items[$key]);
 			}
 		}
 
-		return $messages;
+		// Get results of stock-checking
+		$curl->execute();
+
+		foreach ($curl->getCompletedRequests() as $request) {
+			$item = $request->getExtraInfo();
+			$item->new_stock = $this->parser->validateStock($request->getResponseText(), $item->productId);
+
+			// Add back updated item
+			$items[] = $item;
+		}
+
+		return $items;
 	}
 
-	private function notify($messages) {
+	private function checkStock($curl, $item, $cookies) {
+		// Check for stock
+		$request = $this->request_factory->instantiate($this->base_url . '/disney/store/DSIAjaxOrderItemAdd', 'POST');
+
+		// Set required cookies
+		$request->addOptions(array(
+			CURLOPT_COOKIESESSION => true,
+			CURLOPT_COOKIE => $cookies,
+		))
+		->setExtraInfo($item)
+		->setPostData(array(
+			'quantity' => 1,
+			'originalStoreId' => $this->store_id,
+			'catEntryId' => $item->productId,
+		));
+
+		$curl->add($request);
+	}
+
+	private function notify($items) {
+
 		$new = $old = $restock = 0;
 		$html = "";
 
-		foreach ($messages as $message) {
+		foreach ($items as $item) {
+			$message = $this->parser->generateMessage($item, $this->base_url, $this->locale);
 			$new += $message['new'];
 			$old += $message['old'];
 			$restock += $message['restock'];

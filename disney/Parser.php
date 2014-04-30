@@ -30,26 +30,44 @@ class Parser {
 		}
 
 		return array(
-			'items' => $items,
+			'items' => $items->items,
 			'cookies' => $cookies,
 		);
 	}
 
-	public function validateStock($response, $product_id) {
-		if (\stringContains($response, '_ERR_PROD_NOT_ORDERABLE')) {
-			$stock = OUT_OF_STOCK;
-		} elseif (\stringContains($response, '_ERR_GETTING_SKU')) {
-			$stock = NO_STOCK;
-		} elseif (\stringContains($response, '"catEntryId": "' . $product_id . '"')) {
-			$stock = IN_STOCK;
-		} else {
-			$stock = UNKNOWN_ERROR;
+	public function validateItem($item) {
+		if (
+			$item->status === NEW_ENTRY && (
+				// Collections are basically groups of items that may or may not be elsewhere in the listings.
+				$item->isCollection === "true" ||
+				// Customizable items cannot have stock tracked	
+				\stringContains($item->title, 'Create Your Own')
+			)
+		) {
+			return ADD_NEW_ENTRY;
 		}
 
-		return $stock;
+		// Refresh timer
+		if ($item->stock === NO_STOCK) {
+			return UPDATE_OLD_ENTRY;
+		}
+
+		return CHECK_ON_STOCK;
 	}
 
-	public function generateMessage($item, $base_url, $locale, $stock) {
+	public function validateStock($response, $product_id) {
+		if (\stringContains($response, '_ERR_PROD_NOT_ORDERABLE')) {
+			return OUT_OF_STOCK;
+		} elseif (\stringContains($response, '_ERR_GETTING_SKU')) {
+			return NO_STOCK;
+		} elseif (\stringContains($response, '"catEntryId": "' . $product_id . '"')) {
+			return IN_STOCK;
+		} else {
+			return UNKNOWN_ERROR;
+		}
+	}
+
+	public function generateMessage($item, $base_url, $locale) {
 		$new = $old = $restock = 0;
 
 		$html = "<a href='" . $base_url . "'>" . $item->title . "</a><br/>";
@@ -75,7 +93,7 @@ class Parser {
 
 		$html .= "<br/>Stock: ";
 		
-		switch ($stock) {
+		switch ($item->new_stock) {
 			case IN_STOCK: 
 				$html .= 'Yes';
 				$restock++;
