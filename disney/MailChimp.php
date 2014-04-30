@@ -40,7 +40,7 @@ class MailChimp {
 		if ($this->new > 0) {
 			array_push($subject, $this->new . " new items");
 			$send = true;
-		}
+			}
 
 		if ($this->old > 0) {
 			array_push($subject, $this->old . " existing items");
@@ -60,7 +60,8 @@ class MailChimp {
 
 		$mailchimp = new \Mailchimp($this->key);
 		$campaign = new \Mailchimp_Campaigns($mailchimp);
-		$campaign_info = $campaign->create('regular', array(
+
+		$options = array(
 			'list_id' => $this->list_id,
 			'subject' => $subject,
 			'from_email' => $this->from_email,
@@ -68,10 +69,24 @@ class MailChimp {
 			'to_name' => $this->to_name,
 			'title' => $title,
 			'generate_text' => true,
-		), array(
-			'html' => $this->html(),
-		));
+		);
 
+		$content = array(
+			'html' => $this->html(),
+		);
+
+		$segment_options = array(
+			'match' => 'any',
+			'conditions' => array_map(function($locale) {
+				return array(
+					'field' => 'DISNEY_' . strtoupper($locale),
+					'op' => 'eq',
+					'value' => 'Yes',
+				)
+			}, array_keys($this->html)),
+		);
+
+		$campaign_info = $campaign->create('regular', $options, $content, $segment_options);
 		$campaign->send($campaign_info['id']);
 	}
 
