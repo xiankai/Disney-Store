@@ -49,8 +49,11 @@ try {
 	echo PHP_EOL . $config['locale'] . ': ' . $e->getMessage();
 }
 
-$mailchimp->send();
+$date = date('Y-m-d H:i:s');
+
+$mailchimp->send($date);
 
 $now = microtime(true);
 
-echo sprintf("Elapsed:  %f", $now - $then);
+$redis = new Store\Redis(15, 0);
+$redis->store->set($date, $now - $then);

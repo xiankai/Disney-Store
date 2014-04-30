@@ -33,7 +33,7 @@ class MailChimp {
 		$this->stock += $stock;
 	}
 
-	public function send() {
+	public function send($title) {
 		$subject = array();
 		$send = false;
 
@@ -66,7 +66,7 @@ class MailChimp {
 			'from_email' => $this->from_email,
 			'from_name' => $this->from_name,
 			'to_name' => $this->to_name,
-			'title' => date('Y-m-d H:i:s'),
+			'title' => $title,
 			'generate_text' => true,
 		), array(
 			'html' => $this->html(),

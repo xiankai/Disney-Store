@@ -4,7 +4,7 @@ namespace Store;
 
 class Redis implements StoreInterface {
 
-	private $store;
+	public $store;
 	private $interval;
 
 	function __construct($db, $interval) {
