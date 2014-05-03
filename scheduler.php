@@ -4,7 +4,7 @@ $then = microtime(true);
 
 require 'vendor/autoload.php';
 
-$external_config = parse_ini_file('config.ini', true);
+$external_config = parse_ini_file('/repos/config/disney.ini', true);
 
 date_default_timezone_set($external_config['timezone']);
 
