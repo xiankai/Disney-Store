@@ -20,7 +20,7 @@ class Redis implements StoreInterface {
 	function set($key, $value) {
 		$this->store->set($key, $value);
 
-		$this->store->expire($key, $this->interval * 2);
+		$this->refresh($key);
 	}
 
 	function keyExists($key) {
@@ -29,5 +29,13 @@ class Redis implements StoreInterface {
 
 	function count() {
 		return $this->store->dbsize();
+	}
+
+	function refresh($key) {
+		$this->store->expire($key, $this->interval * 2);
+	}
+
+	function getAll() {
+		return $this->store->keys("*");
 	}
 }

@@ -46,7 +46,17 @@ try {
 		$store->init($curl_factory, $request_factory, $parser);
 	}	
 } catch (Disney\DisneyException $e) {
-	echo PHP_EOL . $config['locale'] . ': ' . $e->getMessage();
+	// In the event of failure, refresh keys indefinitely.
+	foreach ($store->getAll() as $key) {
+		$store->refresh($key);
+	}
+
+	// Store the error message in redis in lieu of execution time
+	$message = $config['locale'] . ': ' . $e->getMessage();
+	$redis->store-.set($date, $message);
+
+	// Echo to cronjob for mail notifications
+	echo PHP_EOL . $message;
 }
 
 $date = date('Y-m-d H:i:s');

@@ -12,4 +12,8 @@ interface StoreInterface {
 	public function keyExists($key);
 
 	public function count();
+
+	public function refresh($key);
+
+	public function getAll();
 }
