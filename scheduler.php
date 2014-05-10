@@ -53,7 +53,7 @@ try {
 
 	// Store the error message in redis in lieu of execution time
 	$message = $config['locale'] . ': ' . $e->getMessage();
-	$redis->store-.set($date, $message);
+	$redis->store->set($date, $message);
 
 	// Echo to cronjob for mail notifications
 	echo PHP_EOL . $message;
