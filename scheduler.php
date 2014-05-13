@@ -47,13 +47,13 @@ try {
 	}	
 } catch (Disney\DisneyException $e) {
 	// In the event of failure, refresh keys indefinitely.
-	foreach ($store->getAll() as $key) {
-		$store->refresh($key);
+	foreach ($redis->getAll() as $key) {
+		$redis->refresh($key);
 	}
 
 	// Store the error message in redis in lieu of execution time
 	$message = $config['locale'] . ': ' . $e->getMessage();
-	$redis->store->set($date, $message);
+	$redis->set($date, $message);
 
 	// Echo to cronjob for mail notifications
 	echo PHP_EOL . $message;
