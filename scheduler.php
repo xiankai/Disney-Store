@@ -39,6 +39,8 @@ $parser = new Disney\Parser();
 // Because the default of 5 makes the site choke and return more errors than usual. What.
 // $rolling_curl->setSimultaneousLimit(2);
 
+$date = date('Y-m-d H:i:s');
+
 try {
 	foreach ($external_config['disney'] as $config) {
 		$redis = new Store\Redis($config['db'], 300);
@@ -58,8 +60,6 @@ try {
 	// Echo to cronjob for mail notifications
 	echo PHP_EOL . $message;
 }
-
-$date = date('Y-m-d H:i:s');
 
 $mailchimp->send($date);
 
